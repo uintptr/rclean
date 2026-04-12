@@ -15,10 +15,6 @@ pub mod cleaner;
 
 #[derive(Parser)]
 struct UserArgs {
-    /// directory
-    #[arg(long, short, default_value_os_t = default_directory().expect("Unable to find default directory"))]
-    directory: PathBuf,
-
     /// Don't ask user
     #[arg(long, short)]
     yes: bool,
@@ -30,6 +26,10 @@ struct UserArgs {
     /// dry run
     #[arg(long)]
     dry_run: bool,
+
+    /// directory
+    #[arg(default_value_os_t = default_directory().expect("Unable to find default directory"))]
+    directory: PathBuf,
 }
 
 fn default_directory() -> Result<PathBuf> {
