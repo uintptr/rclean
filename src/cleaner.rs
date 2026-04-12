@@ -1,7 +1,7 @@
 use std::{
     env::consts,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
 };
 
 use anyhow::{Context, Result, bail};
@@ -35,6 +35,8 @@ impl CargoCleaner {
 
         let mut cmd = Command::new(&self.cargo)
             .arg("clean")
+            .stderr(Stdio::null())
+            .stdout(Stdio::null())
             .current_dir(&directory)
             .spawn()?;
 

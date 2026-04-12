@@ -1,6 +1,9 @@
+use crate::cleaner::CargoCleaner;
 use anyhow::{Context, Result};
 use clap::Parser;
+use colored::Colorize;
 use log::{LevelFilter, error, info};
+use rstaples::display::fmt_size;
 use std::{
     env,
     io::{Write, stdin, stdout},
@@ -8,14 +11,12 @@ use std::{
 };
 use walkdir::WalkDir;
 
-use crate::cargo_cleaner::CargoCleaner;
-
-pub mod cargo_cleaner;
+pub mod cleaner;
 
 #[derive(Parser)]
 struct UserArgs {
     /// directory
-    #[arg(long, short, default_value_os_t = default_directory())]
+    #[arg(long, short, default_value_os_t = default_directory().expect("Unable to find default directory"))]
     directory: PathBuf,
 
     /// Don't ask user
@@ -31,8 +32,8 @@ struct UserArgs {
     dry_run: bool,
 }
 
-fn default_directory() -> PathBuf {
-    env::current_dir().unwrap()
+fn default_directory() -> Result<PathBuf> {
+    Ok(env::current_dir()?)
 }
 
 fn ask_user(question: &str) -> Result<bool> {
@@ -40,9 +41,7 @@ fn ask_user(question: &str) -> Result<bool> {
 
     let mut input = String::new();
     stdout().flush().context("Unable to flush stdout")?;
-    stdin()
-        .read_line(&mut input)
-        .context("Unable to read from stdin")?;
+    stdin().read_line(&mut input).context("Unable to read from stdin")?;
 
     let input = input.trim();
 
@@ -53,10 +52,21 @@ fn ask_user(question: &str) -> Result<bool> {
     Ok(input.to_lowercase() == "y")
 }
 
-fn clean(cleaner: CargoCleaner, directory: &Path) -> Result<()> {
-    println!("Cleaning {}", directory.display());
+fn dir_size(directory: &Path) -> u64 {
+    let mut total_size: u64 = 0;
 
-    for entry in WalkDir::new(directory).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(directory).into_iter().filter_map(Result::ok) {
+        let Ok(m) = entry.metadata() else {
+            continue;
+        };
+
+        total_size = total_size.saturating_add(m.len());
+    }
+    total_size
+}
+
+fn clean(cleaner: &CargoCleaner, directory: &Path) -> Result<()> {
+    for entry in WalkDir::new(directory).into_iter().filter_map(Result::ok) {
         if entry.file_name() != "target" {
             // not a rust target directory
             continue;
@@ -80,9 +90,16 @@ fn clean(cleaner: CargoCleaner, directory: &Path) -> Result<()> {
 
         info!("{}", cargo_dir.display());
 
+        let size = dir_size(cargo_dir);
+
+        print!("Cleaning: {}", cargo_dir.display());
+        stdout().flush().context("Unable to flush stdout")?;
+
         if let Err(e) = cleaner.clean(cargo_dir) {
             error!("{e}");
         }
+
+        println!(" {}", fmt_size(size).green());
     }
 
     Ok(())
@@ -99,8 +116,13 @@ fn main() -> Result<()> {
 
     env_logger::Builder::new().filter_level(level).init();
 
+    let directory = args
+        .directory
+        .canonicalize()
+        .with_context(|| format!("Unable to canonicalize {}", args.directory.display()))?;
+
     if !args.yes {
-        let q = format!("Cleaning {} [Y/n]: ", args.directory.display());
+        let q = format!("Cleaning {} [Y/n]: ", directory.display());
         if !ask_user(&q)? {
             return Ok(());
         }
@@ -108,5 +130,5 @@ fn main() -> Result<()> {
 
     let cleaner = CargoCleaner::new(args.dry_run).context("Unable to initialize cargo cleaner")?;
 
-    clean(cleaner, &args.directory)
+    clean(&cleaner, &directory)
 }
