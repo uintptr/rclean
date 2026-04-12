@@ -9,7 +9,7 @@ Recursively clean build artifacts across multiple Rust projects at once.
 Requires [Rust and Cargo](https://rustup.rs/).
 
 ```sh
-cargo install --git https://github.com/fsck/rclean
+cargo install --git https://github.com/uintptr/rclean
 ```
 
 ## Usage
