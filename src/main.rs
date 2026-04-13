@@ -2,8 +2,7 @@ use crate::cleaner::CargoCleaner;
 use anyhow::{Context, Result};
 use clap::Parser;
 use colored::Colorize;
-use log::{LevelFilter, error, info};
-use rstaples::display::fmt_size;
+use log::{error, info};
 use std::{
     env,
     io::{Write, stdin, stdout},
@@ -18,10 +17,6 @@ struct UserArgs {
     /// Don't ask user
     #[arg(long, short)]
     yes: bool,
-
-    /// verbose
-    #[arg(long, short)]
-    verbose: bool,
 
     /// dry run
     #[arg(long)]
@@ -50,6 +45,25 @@ fn ask_user(question: &str) -> Result<bool> {
     }
 
     Ok(input.to_lowercase() == "y")
+}
+
+fn fmt_size(bytes: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    const TB: f64 = GB * 1024.0;
+
+    if bytes as f64 >= TB {
+        format!("{:.2} TB", bytes as f64 / TB)
+    } else if bytes as f64 >= GB {
+        format!("{:.2} GB", bytes as f64 / GB)
+    } else if bytes as f64 >= MB {
+        format!("{:.2} MB", bytes as f64 / MB)
+    } else if bytes as f64 >= KB {
+        format!("{:.2} KB", bytes as f64 / KB)
+    } else {
+        format!("{} bytes", bytes)
+    }
 }
 
 fn dir_size(directory: &Path) -> u64 {
@@ -108,13 +122,7 @@ fn clean(cleaner: &CargoCleaner, directory: &Path) -> Result<()> {
 fn main() -> Result<()> {
     let args = UserArgs::parse();
 
-    let level = if args.verbose {
-        LevelFilter::Info
-    } else {
-        LevelFilter::Error
-    };
-
-    env_logger::Builder::new().filter_level(level).init();
+    env_logger::init();
 
     let directory = args
         .directory

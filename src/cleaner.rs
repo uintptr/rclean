@@ -20,6 +20,8 @@ impl CargoCleaner {
         let cargo = which(&cargo_program)
             .with_context(|| format!("Unable to find {cargo_program} in PATH"))?;
 
+        info!("cargo is @ {}", cargo.display());
+
         Ok(Self { cargo, dry_run })
     }
 
